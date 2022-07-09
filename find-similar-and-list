@@ -1,0 +1,3 @@
+#!/bin/bash
+
+find -type f -exec sha256sum {} + | sort | uniq --check-chars 10 --all-repeated=separate

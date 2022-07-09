@@ -1,79 +1,98 @@
 import os
 import subprocess
+import collections
+import dataclasses
+import argparse
 
 
-class File:
-    path: str
-    hashsum: str
+@dataclasses.dataclass
+class SimilarFiles(collections.UserList):
+    data: list[str]
 
-    def __init__(self, **kwargs):
-        for key, val in kwargs.items():
-            setattr(self, key, val)
+    @property
+    def filename(self):
+        return os.path.basename(self.data[0])
+
+    @property
+    def file(self):
+        return self.data[0]
+
+    def __init__(self, *args, **kwargs):
+        self.data = [*args]
+        super().__init__(**kwargs)
+
+    def lines(self):
+        count = len(self.data)
+        first_file = self.data[0]
+        size = subprocess.check_output(
+                f"du -h {first_file}", shell=True).decode(
+                        "utf-8").splitlines()[0].split()[0]
+        lines = []
+        lines.append(f"{count} files, size: {size}")
+        lines += self.data
+        return lines
 
 
-def find_all_files() -> list[str]:
-    return subprocess.check_output(
-            "find -type f", shell=True).decode("utf-8").splitlines()
+def get_list_of_similar_files():
+    command = "find -type f -exec sha256sum {} + | sort | uniq --check-chars 10 --all-repeated=separate"
+    out = subprocess.check_output(command, shell=True).decode(
+            "utf-8").splitlines()
+    without_hash = ["".join(row.split()[1:]) for row in out]
+    similar_files: list[SimilarFiles] = []
+    create_new = True
+    for file in without_hash:
+        if file == '':
+            create_new = True
+            continue
+        if create_new:
+            similar_files.append(SimilarFiles(file))
+            create_new = False
+        similar_files[-1].append(file)
+    return similar_files
 
 
-def get_file_hash(path) -> str:
-    return subprocess.check_output(
-            f'sha512sum "{path}"', shell=True).decode("utf-8")
-
-
-def sort_similar_files(files: list[File]) -> list[list[File]]:
-    hashsums = [files[0].hashsum]
-    result = []
-    similar_files = []
+def ignore(files: SimilarFiles, ignore_list: list[str]) -> bool:
     for file in files:
-        if file.hashsum == hashsums[-1]:
-            similar_files.append(file)
-        else:
-            result.append(similar_files.copy())
-            similar_files.clear()
-            similar_files.append(file)
-        hashsums.append(file.hashsum)
-    return result
+        for filename in ignore_list:
+            if filename in file:
+                return True
+    return False
 
 
-def filter_ignore(filenames: list[str],
-                  ignore_filenames: list[str]) -> list[str]:
-    result = []
-    for filename in filenames:
-        skip = False
-        for ignore_filename in ignore_filenames:
-            if ignore_filename in filename:
-                skip = True
-        if not skip:
-            result.append(filename)
-    return result
-
-
-def output(similar_files_list: list) -> list[str]:
-    result = []
-    for similar_files in similar_files_list:
-        lines = [file.path for file in similar_files]
-        result += [*lines, ""]
-    return result
-
-
-def read_ignore_file(filename):
+def read_ignore_file(filename) -> list[str]:
+    if not filename:
+        return []
     if not os.path.isfile(filename):
         raise TypeError
     with open(filename, "r", encoding="utf-8") as file:
-        return file.readlines()
+        return file.read().splitlines()
+
+
+def show(similar_files: list[SimilarFiles]):
+    for i, files in enumerate(similar_files):
+        for line in files.lines():
+            print(line)
+        if i != len(similar_files) - 1:
+            print("")
+
+
+def get_settings():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--files", type=str, nargs="+", help="Files to filter")
+    parser.add_argument("--ignore-file", type=str, required=False)
+    return parser.parse_args()
 
 
 def main():
-    all_files = find_all_files()
-    filtered_files = filter_ignore(all_files, read_ignore_file("./.gitignore"))
-    hashsums_with_filenames = [get_file_hash(path) for path in filtered_files]
-    hashsums = [x.split()[0] for x in hashsums_with_filenames]
-    files = [File(path=a, hashsum=b) for a, b in zip(all_files, hashsums)]
-    files.sort(key=lambda x: x.hashsum)
-    similar_files = sort_similar_files(files)
-    similar_files_filtered = [x for x in similar_files if len(x) > 1]
-    _ = [print(line) for line in output(similar_files_filtered)]
+    settings = get_settings()
+    similar_files = get_list_of_similar_files()
+    ignore_list = read_ignore_file(settings.ignore_file)
+    if settings.files:
+        filtered = [a for a in similar_files if a.filename in settings.files]
+    else:
+        filtered = similar_files
+    filtered_ignore = [a for a in filtered if not ignore(a, ignore_list)]
+    show(filtered_ignore)
 
 
 if __name__ == "__main__":

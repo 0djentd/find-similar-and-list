@@ -8,6 +8,7 @@ import asyncio
 
 @dataclasses.dataclass
 class SimilarFiles(collections.UserList):
+    """List of similar files"""
     data: list[str]
 
     @property
@@ -34,7 +35,8 @@ class SimilarFiles(collections.UserList):
         return lines
 
 
-async def get_list_of_similar_files():
+async def get_list_of_similar_files() -> list[SimilarFiles]:
+    """Returns list of similar files."""
     command = "find -type f -exec sha256sum {} + | sort | uniq --check-chars 10 --all-repeated=separate"
     out = subprocess.check_output(command, shell=True).decode(
             "utf-8").splitlines()
@@ -61,6 +63,7 @@ def ignore(files: SimilarFiles, ignore_list: list[str]) -> bool:
 
 
 async def read_ignore_file(filename) -> list[str]:
+    """Returns list of filenames to ignore"""
     if not filename:
         return []
     if not os.path.isfile(filename):
@@ -70,6 +73,7 @@ async def read_ignore_file(filename) -> list[str]:
 
 
 def show(similar_files: list[SimilarFiles]):
+    """Output"""
     for i, files in enumerate(similar_files):
         for line in files.lines():
             print(line)
@@ -78,6 +82,7 @@ def show(similar_files: list[SimilarFiles]):
 
 
 def get_settings():
+    """Returns settings."""
     parser = argparse.ArgumentParser()
     parser.add_argument("--files", type=str, nargs="+", help="Files to filter")
     parser.add_argument("--ignore-file", type=str, required=False)

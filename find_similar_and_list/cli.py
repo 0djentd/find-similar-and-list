@@ -25,7 +25,7 @@ class SimilarFiles(collections.UserList):
         count = len(self.data)
         first_file = self.data[0]
         size = subprocess.check_output(
-                f"du -h {first_file}", shell=True).decode(
+                f'du -h "{first_file}"', shell=True).decode(
                         "utf-8").splitlines()[0].split()[0]
         lines = []
         lines.append(f"{count} files, size: {size}")

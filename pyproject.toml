@@ -2,6 +2,7 @@
 name = "find-similar-and-list"
 version = "0.1.1"
 description = ""
+readme = "README.md"
 authors = ["0djentd"]
 
 [tool.poetry.scripts]

@@ -3,6 +3,7 @@ import subprocess
 import collections
 import dataclasses
 import argparse
+import asyncio
 
 
 @dataclasses.dataclass
@@ -33,7 +34,7 @@ class SimilarFiles(collections.UserList):
         return lines
 
 
-def get_list_of_similar_files():
+async def get_list_of_similar_files():
     command = "find -type f -exec sha256sum {} + | sort | uniq --check-chars 10 --all-repeated=separate"
     out = subprocess.check_output(command, shell=True).decode(
             "utf-8").splitlines()
@@ -59,7 +60,7 @@ def ignore(files: SimilarFiles, ignore_list: list[str]) -> bool:
     return False
 
 
-def read_ignore_file(filename) -> list[str]:
+async def read_ignore_file(filename) -> list[str]:
     if not filename:
         return []
     if not os.path.isfile(filename):
@@ -83,16 +84,20 @@ def get_settings():
     return parser.parse_args()
 
 
-def main():
+async def main_async():
     settings = get_settings()
-    similar_files = get_list_of_similar_files()
-    ignore_list = read_ignore_file(settings.ignore_file)
+    similar_files = await get_list_of_similar_files()
+    ignore_list = await read_ignore_file(settings.ignore_file)
     if settings.files:
         filtered = [a for a in similar_files if a.filename in settings.files]
     else:
         filtered = similar_files
     filtered_ignore = [a for a in filtered if not ignore(a, ignore_list)]
     show(filtered_ignore)
+
+
+def main():
+    asyncio.run(main_async())
 
 
 if __name__ == "__main__":

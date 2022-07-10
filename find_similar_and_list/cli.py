@@ -4,6 +4,7 @@ import collections
 import dataclasses
 import argparse
 import asyncio
+import logging
 
 
 @dataclasses.dataclass
@@ -12,18 +13,18 @@ class SimilarFiles(collections.UserList):
     data: list[str]
 
     @property
-    def filename(self):
+    def filename(self) -> str:
         return os.path.basename(self.data[0])
 
     @property
-    def file(self):
+    def file(self) -> str:
         return self.data[0]
 
     def __init__(self, *args, **kwargs):
         self.data = [*args]
         super().__init__(**kwargs)
 
-    def lines(self):
+    def lines(self) -> list[str]:
         count = len(self.data)
         first_file = self.data[0]
         size = subprocess.check_output(
@@ -72,7 +73,7 @@ async def read_ignore_file(filename) -> list[str]:
         return file.read().splitlines()
 
 
-def show(similar_files: list[SimilarFiles]):
+def show(similar_files: list[SimilarFiles]) -> None:
     """Output"""
     for i, files in enumerate(similar_files):
         for line in files.lines():
@@ -86,23 +87,28 @@ def get_settings():
     parser = argparse.ArgumentParser()
     parser.add_argument("--files", type=str, nargs="+", help="Files to filter")
     parser.add_argument("--ignore-file", type=str, required=False)
+    parser.add_argument("--debug", type=bool, default=False)
     return parser.parse_args()
 
 
-async def main_async():
-    settings = get_settings()
-    similar_files = await get_list_of_similar_files()
-    ignore_list = await read_ignore_file(settings.ignore_file)
+async def main_async(settings) -> list[SimilarFiles]:
+    async_similar_files = get_list_of_similar_files()
+    async_ignore_file = read_ignore_file(settings.ignore_file)
+    similar_files = await async_similar_files
+    ignore_list = await async_ignore_file
     if settings.files:
         filtered = [a for a in similar_files if a.filename in settings.files]
     else:
         filtered = similar_files
-    filtered_ignore = [a for a in filtered if not ignore(a, ignore_list)]
-    show(filtered_ignore)
+    return [a for a in filtered if not ignore(a, ignore_list)]
 
 
 def main():
-    asyncio.run(main_async())
+    settings = get_settings()
+    if settings.debug:
+        logging.basicConfig(level=logging.DEBUG)
+    result = asyncio.run(main_async(settings))
+    show(result)
 
 
 if __name__ == "__main__":

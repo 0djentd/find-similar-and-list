@@ -4,6 +4,8 @@ version = "0.1.2"
 description = ""
 readme = "README.md"
 authors = ["0djentd"]
+homepage = "https://github.com/0djentd/find-similar-and-list"
+repository = "https://github.com/0djentd/find-similar-and-list"
 
 [tool.poetry.scripts]
 find-similar-and-list = "find_similar_and_list.cli:main"
